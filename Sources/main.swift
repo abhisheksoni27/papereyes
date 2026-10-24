@@ -1,12 +1,13 @@
 import Cocoa
 import Carbon
 
-// MARK: - Texture Styles
+// MARK: - Texture Styles (Full Paperman Lineup)
 enum TextureStyle: String, CaseIterable {
-    case matte = "Matte Paper"
+    case matte = "Classic Matte"
     case whisperWeave = "Whisper Weave"
-    case parchment = "Aged Parchment"
+    case parchment = "Sunbaked Parchment"
     case kraft = "Raw Kraft"
+    case monasticFelt = "Monastic Felt"
     case eink = "E-Ink Reader"
     
     var shortcutNumber: String {
@@ -15,9 +16,18 @@ enum TextureStyle: String, CaseIterable {
         case .whisperWeave: return "2"
         case .parchment: return "3"
         case .kraft: return "4"
-        case .eink: return "5"
+        case .monasticFelt: return "5"
+        case .eink: return "6"
         }
     }
+}
+
+// MARK: - Desk Lamp Presets
+enum DeskLampPosition: String, CaseIterable {
+    case topRight = "Top Right (Right-Handed)"
+    case topLeft = "Top Left (Left-Handed)"
+    case centered = "Overhead Glow"
+    case readingStrip = "Reading Focus Strip"
 }
 
 // MARK: - Procedural Multi-Texture Generator
@@ -46,7 +56,7 @@ func generateTexture(style: TextureStyle, width: Int = 512, height: Int = 512) -
         
     case .parchment:
         // Warm organic variance with fiber pockets
-        tintColor = NSColor(red: 0.96, green: 0.91, blue: 0.82, alpha: 0.12) // Warm parchment wash
+        tintColor = NSColor(red: 0.96, green: 0.91, blue: 0.82, alpha: 0.12)
         for y in 0..<height {
             for x in 0..<width {
                 let base = 210 + Int(sin(Double(x) * 0.05) * 15 + cos(Double(y) * 0.05) * 15)
@@ -58,11 +68,23 @@ func generateTexture(style: TextureStyle, width: Int = 512, height: Int = 512) -
         
     case .kraft:
         // Raw organic paper with darker fiber specks
-        tintColor = NSColor(red: 0.88, green: 0.80, blue: 0.68, alpha: 0.14) // Kraft tint
+        tintColor = NSColor(red: 0.88, green: 0.80, blue: 0.68, alpha: 0.14)
         for i in 0..<(width * height) {
             let isFiber = Int.random(in: 0...100) < 3
             let grain = isFiber ? UInt8.random(in: 110...160) : UInt8.random(in: 180...255)
             rawData[i] = grain
+        }
+        
+    case .monasticFelt:
+        // Soft pressed-wool felt with smooth microfiber density
+        tintColor = NSColor(red: 0.92, green: 0.90, blue: 0.86, alpha: 0.08)
+        for y in 0..<height {
+            for x in 0..<width {
+                let wave = Int(sin(Double(x + y) * 0.12) * 8)
+                let noise = Int.random(in: -12...12)
+                let pixel = min(max(225 + wave + noise, 0), 255)
+                rawData[y * width + x] = UInt8(pixel)
+            }
         }
         
     case .eink:
@@ -128,15 +150,12 @@ func createMenuBarPaperIcon() -> NSImage {
     return image
 }
 
-// MARK: - Paper Overlay View with Desk Lamp Vignette
+// MARK: - Paper Overlay View with Desk Lamp & Idle Art Mode
 class PaperOverlayView: NSView {
-    var opacity: CGFloat = 0.25 {
-        didSet { needsDisplay = true }
-    }
-    
-    var deskLampEnabled: Bool = false {
-        didSet { needsDisplay = true }
-    }
+    var opacity: CGFloat = 0.25 { didSet { needsDisplay = true } }
+    var deskLampEnabled: Bool = false { didSet { needsDisplay = true } }
+    var deskLampPosition: DeskLampPosition = .topRight { didSet { needsDisplay = true } }
+    var isArtModeActive: Bool = false { didSet { needsDisplay = true } }
     
     private var texturePattern: NSColor
     private var currentTintColor: NSColor?
@@ -159,36 +178,94 @@ class PaperOverlayView: NSView {
     
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
-        
         context.saveGState()
         
-        // 1. Draw Paper Grain Texture
+        // --- 1. IDLE ART MODE (Gallery Mat & Frame Overlay) ---
+        if isArtModeActive {
+            // Dark museum backdrop
+            NSColor(red: 0.07, green: 0.07, blue: 0.08, alpha: 0.96).setFill()
+            dirtyRect.fill()
+            
+            // Framed Mat (Simulating framed gallery art pass)
+            let matMargin: CGFloat = min(bounds.width, bounds.height) * 0.12
+            let matRect = bounds.insetBy(dx: matMargin, dy: matMargin)
+            
+            // Outer frame shadow
+            context.setShadow(offset: CGSize(width: 0, height: -10), blur: 30, color: NSColor.black.cgColor)
+            NSColor(red: 0.15, green: 0.12, blue: 0.10, alpha: 1.0).setFill() // Hardwood frame
+            matRect.insetBy(dx: -12, dy: -12).fill()
+            
+            context.setShadow(offset: .zero, blur: 0, color: nil)
+            
+            // Archival white mat board
+            NSColor(red: 0.95, green: 0.94, blue: 0.91, alpha: 1.0).setFill()
+            matRect.fill()
+            
+            // Art Canvas
+            let artRect = matRect.insetBy(dx: 45, dy: 45)
+            NSColor(red: 0.90, green: 0.88, blue: 0.84, alpha: 1.0).setFill()
+            artRect.fill()
+            
+            // Subtle Gallery Plaque typography
+            let pStyle = NSMutableParagraphStyle()
+            pStyle.alignment = .center
+            let plaqueAttrs: [NSAttributedString.Key: Any] = [
+                .font: NSFont.systemFont(ofSize: 13, weight: .light),
+                .foregroundColor: NSColor(white: 0.35, alpha: 1.0),
+                .paragraphStyle: pStyle
+            ]
+            let plaqueString = "Paperman Art Gallery — Idle Mode (Move cursor to resume)"
+            let plaqueRect = NSRect(x: matRect.minX, y: matRect.minY + 12, width: matRect.width, height: 20)
+            plaqueString.draw(in: plaqueRect, withAttributes: plaqueAttrs)
+            
+            // Overlay paper grain onto the framed art
+            context.setBlendMode(.multiply)
+            context.setAlpha(0.35)
+            texturePattern.setFill()
+            artRect.fill()
+            
+            context.restoreGState()
+            return
+        }
+        
+        // --- 2. REGULAR MODE: Tactile Grain Overlay ---
         context.setBlendMode(.multiply)
         context.setAlpha(opacity)
         texturePattern.setFill()
         dirtyRect.fill()
         
-        // 2. Draw Warm Material Tint (if style has one)
+        // --- 3. Warm Material Color Wash ---
         if let tint = currentTintColor {
             context.setBlendMode(.colorBurn)
             tint.setFill()
             dirtyRect.fill()
         }
         
-        // 3. Desk Lamp Mode: Soft warm radial vignette from top-right
+        // --- 4. DESK LAMP AMBIENCE MODES ---
         if deskLampEnabled {
             context.setBlendMode(.softLight)
             let colorSpace = CGColorSpaceCreateDeviceRGB()
             let warmLampColors = [
-                NSColor(red: 1.0, green: 0.88, blue: 0.65, alpha: 0.35).cgColor,
-                NSColor(red: 1.0, green: 0.82, blue: 0.55, alpha: 0.08).cgColor,
-                NSColor(red: 0.1, green: 0.05, blue: 0.0, alpha: 0.15).cgColor
+                NSColor(red: 1.0, green: 0.88, blue: 0.65, alpha: 0.38).cgColor,
+                NSColor(red: 1.0, green: 0.82, blue: 0.55, alpha: 0.10).cgColor,
+                NSColor(red: 0.08, green: 0.04, blue: 0.0, alpha: 0.18).cgColor
             ] as CFArray
             let locations: [CGFloat] = [0.0, 0.45, 1.0]
             
             if let gradient = CGGradient(colorsSpace: colorSpace, colors: warmLampColors, locations: locations) {
-                let lampCenter = CGPoint(x: bounds.width * 0.85, y: bounds.height * 0.90)
-                let startRadius: CGFloat = 20
+                let lampCenter: CGPoint
+                switch deskLampPosition {
+                case .topRight:
+                    lampCenter = CGPoint(x: bounds.width * 0.88, y: bounds.height * 0.92)
+                case .topLeft:
+                    lampCenter = CGPoint(x: bounds.width * 0.12, y: bounds.height * 0.92)
+                case .centered:
+                    lampCenter = CGPoint(x: bounds.width * 0.50, y: bounds.height * 0.98)
+                case .readingStrip:
+                    lampCenter = CGPoint(x: bounds.width * 0.50, y: bounds.height * 0.50)
+                }
+                
+                let startRadius: CGFloat = (deskLampPosition == .readingStrip) ? 80 : 25
                 let endRadius: CGFloat = max(bounds.width, bounds.height) * 1.05
                 context.drawRadialGradient(
                     gradient,
@@ -233,21 +310,22 @@ class PaperOverlayWindow: NSWindow {
     }
     
     func setOpacity(_ value: CGFloat) {
-        if let view = self.contentView as? PaperOverlayView {
-            view.opacity = value
-        }
+        (contentView as? PaperOverlayView)?.opacity = value
     }
     
     func setStyle(_ style: TextureStyle) {
-        if let view = self.contentView as? PaperOverlayView {
-            view.updateStyle(style)
-        }
+        (contentView as? PaperOverlayView)?.updateStyle(style)
     }
     
-    func setDeskLamp(_ enabled: Bool) {
-        if let view = self.contentView as? PaperOverlayView {
-            view.deskLampEnabled = enabled
-        }
+    func setDeskLamp(_ enabled: Bool, position: DeskLampPosition) {
+        guard let view = contentView as? PaperOverlayView else { return }
+        view.deskLampEnabled = enabled
+        view.deskLampPosition = position
+    }
+    
+    func setArtMode(_ active: Bool) {
+        guard let view = contentView as? PaperOverlayView else { return }
+        view.isArtModeActive = active
     }
 }
 
@@ -298,10 +376,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var isEnabled = true
     var currentOpacity: CGFloat = 0.25 // Default: Strong
     var currentStyle: TextureStyle = .matte
-    var deskLampEnabled: Bool = false
-    var autoExclusionEnabled: Bool = true
     
-    // Excluded application bundle IDs (graphics/color-critical & media apps)
+    // Desk Lamp Settings
+    var deskLampEnabled: Bool = false
+    var deskLampPosition: DeskLampPosition = .topRight
+    
+    // Circadian Auto Shift
+    var circadianShiftEnabled: Bool = true
+    var circadianTimer: Timer?
+    
+    // Idle Art Mode
+    var artModeEnabled: Bool = false
+    var isCurrentlyInArtMode: Bool = false
+    var idleCheckTimer: Timer?
+    var lastUserActivityTime: Date = Date()
+    var lastMousePosition: NSPoint = NSEvent.mouseLocation
+    
+    // App Exclusion
+    var autoExclusionEnabled: Bool = true
     let excludedBundleIDs: Set<String> = [
         "com.adobe.Photoshop",
         "com.adobe.Illustrator",
@@ -313,9 +405,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         "org.videolan.vlc",
         "com.apple.Photos"
     ]
+    private var isTemporarilyMutedByExclusion = false
     
     var hotKey: GlobalHotKey!
-    private var isTemporarilyMutedByExclusion = false
     
     func applicationDidFinishLaunching(_ notification: Notification) {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -326,6 +418,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupWindows()
         buildMenu()
         setupAppExclusionWatcher()
+        setupCircadianEngine()
+        setupIdleArtWatcher()
         
         hotKey = GlobalHotKey()
         hotKey.onTrigger = { [weak self] in
@@ -342,7 +436,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         for screen in NSScreen.screens {
             let win = PaperOverlayWindow(screen: screen, style: currentStyle)
             win.setOpacity(currentOpacity)
-            win.setDeskLamp(deskLampEnabled)
+            win.setDeskLamp(deskLampEnabled, position: deskLampPosition)
             win.orderFrontRegardless()
             overlayWindows.append(win)
         }
@@ -351,7 +445,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func buildMenu() {
         let menu = NSMenu()
         
-        // 1. Toggle item
+        // 1. Toggle status
         let toggleTitle = isEnabled ? "PaperEyes: Active  (⌘⇧P)" : "PaperEyes: Paused  (⌘⇧P)"
         let toggleItem = NSMenuItem(title: toggleTitle, action: #selector(toggleEffect), keyEquivalent: "")
         toggleItem.target = self
@@ -359,7 +453,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         menu.addItem(NSMenuItem.separator())
         
-        // 2. Texture Styles Submenu
+        // 2. Texture Finishes Submenu
         let textureMenu = NSMenu()
         for style in TextureStyle.allCases {
             let item = NSMenuItem(title: style.rawValue, action: #selector(selectTextureStyle(_:)), keyEquivalent: style.shortcutNumber)
@@ -372,15 +466,39 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.setSubmenu(textureMenu, for: textureSubmenuItem)
         menu.addItem(textureSubmenuItem)
         
-        // 3. Desk Lamp Mode Toggle
-        let lampItem = NSMenuItem(title: "Desk Lamp Ambience", action: #selector(toggleDeskLamp), keyEquivalent: "l")
-        lampItem.target = self
-        lampItem.state = deskLampEnabled ? .on : .off
-        menu.addItem(lampItem)
+        // 3. Desk Lamp Ambience Submenu
+        let lampMenu = NSMenu()
+        let lampToggle = NSMenuItem(title: deskLampEnabled ? "Lamp: Enabled" : "Lamp: Disabled", action: #selector(toggleDeskLamp), keyEquivalent: "l")
+        lampToggle.target = self
+        lampToggle.state = deskLampEnabled ? .on : .off
+        lampMenu.addItem(lampToggle)
+        lampMenu.addItem(NSMenuItem.separator())
+        for pos in DeskLampPosition.allCases {
+            let posItem = NSMenuItem(title: pos.rawValue, action: #selector(selectLampPosition(_:)), keyEquivalent: "")
+            posItem.target = self
+            posItem.representedObject = pos
+            posItem.state = (pos == deskLampPosition) ? .on : .off
+            lampMenu.addItem(posItem)
+        }
+        let lampSubmenuItem = NSMenuItem(title: "Desk Lamp Mode", action: nil, keyEquivalent: "")
+        menu.setSubmenu(lampMenu, for: lampSubmenuItem)
+        menu.addItem(lampSubmenuItem)
+        
+        // 4. Idle Art Mode Toggle
+        let artItem = NSMenuItem(title: "Idle Art Mode (Gallery Frame)", action: #selector(toggleArtMode), keyEquivalent: "")
+        artItem.target = self
+        artItem.state = artModeEnabled ? .on : .off
+        menu.addItem(artItem)
+        
+        // 5. Circadian Day/Night Transition
+        let circadianItem = NSMenuItem(title: "Circadian Shift (Day/Night)", action: #selector(toggleCircadian), keyEquivalent: "")
+        circadianItem.target = self
+        circadianItem.state = circadianShiftEnabled ? .on : .off
+        menu.addItem(circadianItem)
         
         menu.addItem(NSMenuItem.separator())
         
-        // 4. Opacity Presets
+        // 6. Intensity / Opacity Submenu
         let opacityMenu = NSMenu()
         let opacities: [(String, CGFloat)] = [
             ("Light (10%)", 0.10),
@@ -399,12 +517,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.setSubmenu(opacityMenu, for: opacitySubmenuItem)
         menu.addItem(opacitySubmenuItem)
         
-        // 5. Auto-Exclusion for Design & Photo Apps
-        let exclusionItem = NSMenuItem(
-            title: "Pause for Design/Video Apps",
-            action: #selector(toggleAutoExclusion),
-            keyEquivalent: ""
-        )
+        // 7. Auto App Exclusion Toggle
+        let exclusionItem = NSMenuItem(title: "Auto-Pause in Design/Video Apps", action: #selector(toggleAutoExclusion), keyEquivalent: "")
         exclusionItem.target = self
         exclusionItem.state = autoExclusionEnabled ? .on : .off
         menu.addItem(exclusionItem)
@@ -413,6 +527,54 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "Quit PaperEyes", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         
         statusItem.menu = menu
+    }
+    
+    // MARK: - Circadian Day / Night Engine
+    func setupCircadianEngine() {
+        circadianTimer = Timer.scheduledTimer(withTimeInterval: 300, repeats: true) { [weak self] _ in
+            self?.evaluateCircadianProfile()
+        }
+        evaluateCircadianProfile()
+    }
+    
+    func evaluateCircadianProfile() {
+        guard circadianShiftEnabled else { return }
+        let hour = Calendar.current.component(.hour, from: Date())
+        
+        // Evening / Night (8 PM to 6 AM): Switch to warm parchment & enable desk lamp
+        if hour >= 20 || hour < 6 {
+            if currentStyle == .matte {
+                currentStyle = .parchment
+                deskLampEnabled = true
+                for win in overlayWindows {
+                    win.setStyle(.parchment)
+                    win.setDeskLamp(true, position: deskLampPosition)
+                }
+                buildMenu()
+            }
+        }
+    }
+    
+    // MARK: - Idle Art Mode Watcher
+    func setupIdleArtWatcher() {
+        idleCheckTimer = Timer.scheduledTimer(withTimeInterval: 2.0, repeats: true) { [weak self] _ in
+            guard let self = self, self.artModeEnabled else { return }
+            let currentMouse = NSEvent.mouseLocation
+            if currentMouse != self.lastMousePosition {
+                self.lastUserActivityTime = Date()
+                self.lastMousePosition = currentMouse
+                if self.isCurrentlyInArtMode {
+                    self.isCurrentlyInArtMode = false
+                    for win in self.overlayWindows { win.setArtMode(false) }
+                }
+            } else {
+                // If idle for more than 3 minutes, enter Art Mode
+                if Date().timeIntervalSince(self.lastUserActivityTime) > 180 && !self.isCurrentlyInArtMode {
+                    self.isCurrentlyInArtMode = true
+                    for win in self.overlayWindows { win.setArtMode(true) }
+                }
+            }
+        }
     }
     
     // MARK: - App Exclusion Notification Listener
@@ -431,7 +593,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
               let bundleID = app.bundleIdentifier else { return }
         
         let shouldMute = excludedBundleIDs.contains(bundleID)
-        
         if shouldMute && !isTemporarilyMutedByExclusion {
             isTemporarilyMutedByExclusion = true
             for win in overlayWindows { win.setIsVisible(false) }
@@ -445,26 +606,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func toggleEffect() {
         isEnabled.toggle()
         isTemporarilyMutedByExclusion = false
-        for win in overlayWindows {
-            win.setIsVisible(isEnabled)
-        }
+        for win in overlayWindows { win.setIsVisible(isEnabled) }
         buildMenu()
     }
     
     @objc func selectTextureStyle(_ sender: NSMenuItem) {
         guard let style = sender.representedObject as? TextureStyle else { return }
         currentStyle = style
-        for win in overlayWindows {
-            win.setStyle(style)
-        }
+        for win in overlayWindows { win.setStyle(style) }
         buildMenu()
     }
     
     @objc func toggleDeskLamp() {
         deskLampEnabled.toggle()
-        for win in overlayWindows {
-            win.setDeskLamp(deskLampEnabled)
+        for win in overlayWindows { win.setDeskLamp(deskLampEnabled, position: deskLampPosition) }
+        buildMenu()
+    }
+    
+    @objc func selectLampPosition(_ sender: NSMenuItem) {
+        guard let pos = sender.representedObject as? DeskLampPosition else { return }
+        deskLampPosition = pos
+        deskLampEnabled = true
+        for win in overlayWindows { win.setDeskLamp(true, position: pos) }
+        buildMenu()
+    }
+    
+    @objc func toggleArtMode() {
+        artModeEnabled.toggle()
+        if !artModeEnabled && isCurrentlyInArtMode {
+            isCurrentlyInArtMode = false
+            for win in overlayWindows { win.setArtMode(false) }
         }
+        buildMenu()
+    }
+    
+    @objc func toggleCircadian() {
+        circadianShiftEnabled.toggle()
+        if circadianShiftEnabled { evaluateCircadianProfile() }
         buildMenu()
     }
     
@@ -480,9 +658,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func setPresetOpacity(_ sender: NSMenuItem) {
         guard let val = sender.representedObject as? CGFloat else { return }
         currentOpacity = val
-        for win in overlayWindows {
-            win.setOpacity(val)
-        }
+        for win in overlayWindows { win.setOpacity(val) }
         buildMenu()
     }
 }
