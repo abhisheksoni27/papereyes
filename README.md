@@ -1,8 +1,8 @@
-# Paperman for macOS (Clean-Room Native Clone)
+# PaperEyes for macOS
 
 A lightweight, zero-latency screen texture overlay for macOS designed to alleviate digital eye strain by introducing physical paper grain across your displays.
 
-Inspired by [paperman.cc](https://paperman.cc), built natively using AppKit, CoreGraphics, and Carbon.
+Inspired by tactile paper surfaces, built natively using AppKit, CoreGraphics, and Carbon.
 
 ---
 
@@ -34,13 +34,13 @@ Clone and build directly via Terminal:
 
 ```bash
 git clone <YOUR_GIT_REMOTE_URL>
-cd paperman-macos
+cd papereyes
 
 # Compile
-swiftc -O Sources/main.swift -o Paperman
+swiftc -O Sources/main.swift -o PaperEyes
 
 # Run in background
-./Paperman &
+./PaperEyes &
 ```
 
 Or run via the build script:
@@ -72,4 +72,4 @@ chmod +x build.sh
 
 ## License
 
-MIT License. Designed and reverse-engineered with clean-room principles.
+MIT License.
